@@ -172,36 +172,24 @@ h1 {
 }
 
 .month-tabs {
-  display: flex;
-  overflow-x: auto;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
   margin-bottom: 20px;
-  padding-bottom: 10px;
-  scrollbar-width: thin;
-}
-
-.month-tabs::-webkit-scrollbar {
-  height: 6px;
-}
-
-.month-tabs::-webkit-scrollbar-thumb {
-  background: var(--glass-border);
-  border-radius: 10px;
 }
 
 .month-tab-btn {
-  flex: 0 0 auto;
-  min-width: 60px;
-  padding: 10px 16px;
-  border-radius: 14px;
+  padding: 10px 4px;
+  border-radius: 12px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   color: var(--text-secondary);
   font-family: inherit;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
   transition: var(--transition);
+  text-align: center;
 }
 
 .month-tab-btn.active {
@@ -265,19 +253,20 @@ h1 {
 }
 
 .input-label {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-secondary);
   font-weight: 500;
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-right: 10px;
+  padding-right: 8px;
 }
 
 .input-wrapper {
   position: relative;
-  width: 120px;
+  width: 100px;
+  flex-shrink: 0;
 }
 
 .input-wrapper input {
