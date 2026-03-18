@@ -24,7 +24,7 @@ const defaultStocks = [
   "KODEX 미국AI테크TOP10",
   "RISE 미국테크100데일리고정커버드콜",
   "KODEX 미국AI전력핵심인프라",
-  "KODEX 미국시총개미"
+  "KODEX 미국서학개미"
 ];
 
 // State
