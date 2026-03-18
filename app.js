@@ -33,11 +33,15 @@ let dividendData = {}; // "1" ~ "12" mapping to stock amounts
 let myChart = null;
 const CURRENT_YEAR = 2026;
 let currentMonth = new Date().getMonth() + 1;
+let viewMode = 'month'; // 'month' or 'stock'
+let currentStock = '';
 
 // Elements
 const totalDividendEl = document.getElementById('total-dividend');
 const monthTabsContainer = document.getElementById('month-tabs');
 const monthDetailContainer = document.getElementById('month-detail-container');
+const viewMonthBtn = document.getElementById('view-month-btn');
+const viewStockBtn = document.getElementById('view-stock-btn');
 const settingsBtn = document.getElementById('settings-btn');
 const closeModalBtn = document.getElementById('close-modal-btn');
 const settingsModal = document.getElementById('settings-modal');
@@ -71,6 +75,7 @@ function loadData() {
       }
       saveToFirebase();
     }
+    if (stocks.length > 0 && !currentStock) currentStock = stocks[0];
     renderApp();
   }).catch((error) => {
     console.error("Firebase fetch error:", error);
@@ -106,8 +111,8 @@ function saveData() {
 // Render everything
 function renderApp() {
   updateDashboard();
-  renderMonthTabs();
-  renderSelectedMonth();
+  renderTabs();
+  renderSelectedDetails();
   renderChart();
   renderSettingsList();
 }
@@ -133,61 +138,118 @@ function getMonthTotal(month) {
   return total;
 }
 
-// Render Month Tabs
-function renderMonthTabs() {
+// Render Tabs (Month or Stock view)
+function renderTabs() {
   monthTabsContainer.innerHTML = '';
-  for (let m = 1; m <= 12; m++) {
-    const btn = document.createElement('button');
-    btn.className = `month-tab-btn ${m === currentMonth ? 'active' : ''}`;
-    btn.innerText = `${m}월`;
-    btn.addEventListener('click', () => {
-      currentMonth = m;
-      renderMonthTabs();
-      renderSelectedMonth();
+  
+  if (viewMode === 'month') {
+    monthTabsContainer.className = 'month-tabs';
+    for (let m = 1; m <= 12; m++) {
+      const btn = document.createElement('button');
+      btn.className = `month-tab-btn ${m === currentMonth ? 'active' : ''}`;
+      btn.innerText = `${m}월`;
+      btn.addEventListener('click', () => {
+        currentMonth = m;
+        renderTabs();
+        renderSelectedDetails();
+      });
+      monthTabsContainer.appendChild(btn);
+    }
+  } else {
+    monthTabsContainer.className = 'stock-tabs';
+    stocks.forEach(stock => {
+      const btn = document.createElement('button');
+      btn.className = `stock-tab-btn ${stock === currentStock ? 'active' : ''}`;
+      btn.innerText = stock;
+      btn.addEventListener('click', () => {
+        currentStock = stock;
+        renderTabs();
+        renderSelectedDetails();
+      });
+      monthTabsContainer.appendChild(btn);
     });
-    monthTabsContainer.appendChild(btn);
   }
 }
 
-// Render Selected Month Details
-function renderSelectedMonth() {
+// Render Selected Details pane
+function renderSelectedDetails() {
   if (!monthDetailContainer) return;
   monthDetailContainer.innerHTML = '';
-  const monthTotal = getMonthTotal(currentMonth);
+  
+  if (viewMode === 'month') {
+    const monthTotal = getMonthTotal(currentMonth);
 
-  // Header
-  const header = document.createElement('div');
-  header.className = 'month-total-header';
-  header.innerHTML = `
-    <h4>${currentMonth}월 상세 내역</h4>
-    <span class="total-val" id="current-month-total">${monthTotal.toLocaleString()}원</span>
-  `;
-  monthDetailContainer.appendChild(header);
-
-  const hr = document.createElement('hr');
-  monthDetailContainer.appendChild(hr);
-
-  const grid = document.createElement('div');
-  grid.className = 'dividend-grid';
-
-  stocks.forEach(stock => {
-    const val = dividendData[currentMonth][stock] || 0;
-    const inputGroup = document.createElement('div');
-    inputGroup.className = 'input-group';
-    inputGroup.innerHTML = `
-      <span class="input-label" title="${stock}">${stock}</span>
-      <div class="input-wrapper">
-        <input type="text" inputmode="numeric" 
-               data-month="${currentMonth}" data-stock="${stock}" 
-               value="${val === 0 ? '' : val.toLocaleString()}" 
-               placeholder="0">
-        <span class="input-suffix">원</span>
-      </div>
+    const header = document.createElement('div');
+    header.className = 'month-total-header';
+    header.innerHTML = `
+      <h4>${currentMonth}월 상세 내역</h4>
+      <span class="total-val" id="current-month-total">${monthTotal.toLocaleString()}원</span>
     `;
-    grid.appendChild(inputGroup);
-  });
+    monthDetailContainer.appendChild(header);
 
-  monthDetailContainer.appendChild(grid);
+    const hr = document.createElement('hr');
+    monthDetailContainer.appendChild(hr);
+
+    const grid = document.createElement('div');
+    grid.className = 'dividend-grid';
+
+    stocks.forEach(stock => {
+      const val = dividendData[currentMonth][stock] || 0;
+      const inputGroup = document.createElement('div');
+      inputGroup.className = 'input-group';
+      inputGroup.innerHTML = `
+        <span class="input-label" title="${stock}">${stock}</span>
+        <div class="input-wrapper">
+          <input type="text" inputmode="numeric" 
+                 data-month="${currentMonth}" data-stock="${stock}" 
+                 value="${val === 0 ? '' : val.toLocaleString()}" 
+                 placeholder="0">
+          <span class="input-suffix">원</span>
+        </div>
+      `;
+      grid.appendChild(inputGroup);
+    });
+
+    monthDetailContainer.appendChild(grid);
+  } else {
+    // Stock View mode
+    let stockTotal = 0;
+    for (let m = 1; m <= 12; m++) {
+       stockTotal += (dividendData[m][currentStock] || 0);
+    }
+
+    const header = document.createElement('div');
+    header.className = 'month-total-header';
+    header.innerHTML = `
+      <h4>${currentStock} 상세 내역</h4>
+      <span class="total-val" id="current-stock-total">${stockTotal.toLocaleString()}원</span>
+    `;
+    monthDetailContainer.appendChild(header);
+
+    const hr = document.createElement('hr');
+    monthDetailContainer.appendChild(hr);
+
+    const grid = document.createElement('div');
+    grid.className = 'dividend-grid';
+
+    for(let m = 1; m <= 12; m++) {
+      const val = dividendData[m][currentStock] || 0;
+      const inputGroup = document.createElement('div');
+      inputGroup.className = 'input-group';
+      inputGroup.innerHTML = `
+        <span class="input-label">${m}월</span>
+        <div class="input-wrapper">
+          <input type="text" inputmode="numeric" 
+                 data-month="${m}" data-stock="${currentStock}" 
+                 value="${val === 0 ? '' : val.toLocaleString()}" 
+                 placeholder="0">
+          <span class="input-suffix">원</span>
+        </div>
+      `;
+      grid.appendChild(inputGroup);
+    }
+    monthDetailContainer.appendChild(grid);
+  }
 
   // Attach input events
   const inputs = monthDetailContainer.querySelectorAll('input');
@@ -215,7 +277,16 @@ function renderSelectedMonth() {
         dividendData[m][s] = amount;
         saveData();
         
-        document.getElementById('current-month-total').innerText = getMonthTotal(m).toLocaleString() + '원';
+        if (viewMode === 'month') {
+          const mLabel = document.getElementById('current-month-total');
+          if (mLabel) mLabel.innerText = getMonthTotal(m).toLocaleString() + '원';
+        } else {
+          let stTotal = 0;
+          for(let tm=1; tm<=12; tm++) stTotal += (dividendData[tm][currentStock] || 0);
+          const sLabel = document.getElementById('current-stock-total');
+          if (sLabel) sLabel.innerText = stTotal.toLocaleString() + '원';
+        }
+        
         updateDashboard();
         updateChartData();
     });
@@ -332,6 +403,28 @@ function renderSettingsList() {
 }
 
 function setupEventListeners() {
+  // View mode toggles
+  if(viewMonthBtn) {
+    viewMonthBtn.addEventListener('click', () => {
+      viewMode = 'month';
+      viewMonthBtn.classList.add('active');
+      viewStockBtn.classList.remove('active');
+      renderTabs();
+      renderSelectedDetails();
+    });
+  }
+  
+  if(viewStockBtn) {
+    viewStockBtn.addEventListener('click', () => {
+      viewMode = 'stock';
+      if (!currentStock && stocks.length > 0) currentStock = stocks[0];
+      viewStockBtn.classList.add('active');
+      viewMonthBtn.classList.remove('active');
+      renderTabs();
+      renderSelectedDetails();
+    });
+  }
+
   // Modal toggle
   settingsBtn.addEventListener('click', () => {
     settingsModal.classList.add('show');
@@ -354,6 +447,7 @@ function setupEventListeners() {
     const newStock = newStockInput.value.trim();
     if(newStock && !stocks.includes(newStock)) {
       stocks.push(newStock);
+      if(!currentStock) currentStock = newStock;
       newStockInput.value = '';
       saveStocks();
       renderSettingsList();

@@ -165,10 +165,39 @@ h1 {
 }
 
 /* Monthly List */
-.monthly-list h3 {
-  font-size: 20px;
+.section-header-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16px;
+}
+.section-header-toggle h3 {
+  font-size: 20px;
   font-weight: 600;
+  margin-bottom: 0;
+}
+.view-toggle {
+  display: flex;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 4px;
+}
+.toggle-btn {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.toggle-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
 .month-tabs {
@@ -199,6 +228,33 @@ h1 {
 }
 
 .month-tab-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.stock-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.stock-tab-btn {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.stock-tab-btn.active {
+  background: var(--accent-color);
+  color: #000;
+  border-color: var(--accent-color);
+}
+.stock-tab-btn:hover:not(.active) {
   background: rgba(255, 255, 255, 0.15);
 }
 
