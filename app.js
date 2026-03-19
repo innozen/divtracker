@@ -31,12 +31,14 @@ const defaultStocks = [
 let stocks = [];
 let dividendData = {}; // "1" ~ "12" mapping to stock amounts
 let myChart = null;
-const CURRENT_YEAR = 2026;
+let currentYear = 2026;
 let currentMonth = new Date().getMonth() + 1;
 let viewMode = 'month'; // 'month' or 'stock'
 let currentStock = '';
+let yearlyGoal = 5000000;
 
 // Elements
+const yearSelectorEl = document.getElementById('year-selector');
 const totalDividendEl = document.getElementById('total-dividend');
 const monthTabsContainer = document.getElementById('month-tabs');
 const monthDetailContainer = document.getElementById('month-detail-container');
@@ -49,21 +51,47 @@ const stockListEl = document.getElementById('stock-list');
 const addStockForm = document.getElementById('add-stock-form');
 const newStockInput = document.getElementById('new-stock-input');
 
+// Goal Elements
+const goalPercentEl = document.getElementById('goal-percent');
+const goalFillEl = document.getElementById('goal-fill');
+const goalAmountTextEl = document.getElementById('goal-amount-text');
+const goalInputEl = document.getElementById('goal-input');
+const saveGoalBtn = document.getElementById('save-goal-btn');
+
 // Init
 function init() {
-  document.getElementById('current-year').innerText = CURRENT_YEAR;
+  initYearSelector();
   setupEventListeners();
   loadData();
+}
+
+function initYearSelector() {
+  if (!yearSelectorEl) return;
+  yearSelectorEl.innerHTML = '';
+  
+  const startYear = 2025;
+  const currentSysYear = new Date().getFullYear();
+  const maxYear = Math.max(currentSysYear + 1, currentYear); // up to next year for planning
+  
+  for (let y = startYear; y <= maxYear; y++) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.innerText = y;
+    yearSelectorEl.appendChild(opt);
+  }
+  
+  yearSelectorEl.value = currentYear;
 }
 
 // Load from Firebase
 function loadData() {
   const dbRef = db.ref();
-  dbRef.child(`divTracker_${CURRENT_YEAR}`).get().then((snapshot) => {
+  dbRef.child(`divTracker_${currentYear}`).get().then((snapshot) => {
     if (snapshot.exists()) {
       const data = snapshot.val();
       stocks = data.stocks || [...defaultStocks];
       dividendData = data.dividendData || {};
+      yearlyGoal = data.yearlyGoal || 5000000;
       for (let i = 1; i <= 12; i++) {
         if (!dividendData[i]) dividendData[i] = {};
       }
@@ -84,9 +112,10 @@ function loadData() {
 }
 
 function saveToFirebase() {
-  db.ref(`divTracker_${CURRENT_YEAR}`).set({
+  db.ref(`divTracker_${currentYear}`).set({
     stocks: stocks,
-    dividendData: dividendData
+    dividendData: dividendData,
+    yearlyGoal: yearlyGoal
   });
 }
 
@@ -117,12 +146,40 @@ function renderApp() {
   renderSettingsList();
 }
 
+// Update Dashboard Total
 function updateDashboard() {
   let yearlyTotal = 0;
   for (let m = 1; m <= 12; m++) {
     yearlyTotal += getMonthTotal(m);
   }
   totalDividendEl.innerText = yearlyTotal.toLocaleString();
+  
+  if (goalAmountTextEl) goalAmountTextEl.innerText = yearlyGoal.toLocaleString();
+  
+  let percent = 0;
+  if(yearlyGoal > 0) {
+    percent = (yearlyTotal / yearlyGoal) * 100;
+  }
+  
+  // Format nicely (e.g. 42.5%)
+  const displayPercent = yearlyGoal > 0 ? ((yearlyTotal / yearlyGoal) * 100).toFixed(1) : 0;
+  
+  if (goalPercentEl) goalPercentEl.innerText = `${displayPercent}%`;
+  
+  if (goalFillEl) {
+    setTimeout(() => {
+      let widthPercent = percent > 100 ? 100 : percent;
+      goalFillEl.style.width = `${widthPercent}%`;
+      
+      if(percent >= 100) {
+        goalFillEl.style.background = 'linear-gradient(90deg, #f59e0b, #eab308)'; // Golden when done
+        goalPercentEl.style.color = '#f59e0b';
+      } else {
+        goalFillEl.style.background = 'linear-gradient(90deg, #818cf8, #4f46e5)'; // Standard Indigo
+        goalPercentEl.style.color = 'var(--accent-color)';
+      }
+    }, 100);
+  }
 }
 
 function getMonthTotal(month) {
@@ -158,15 +215,23 @@ function renderTabs() {
   } else {
     monthTabsContainer.className = 'stock-tabs';
     stocks.forEach(stock => {
-      const btn = document.createElement('button');
-      btn.className = `stock-tab-btn ${stock === currentStock ? 'active' : ''}`;
-      btn.innerText = stock;
-      btn.addEventListener('click', () => {
+      let stockTotal = 0;
+      for (let m = 1; m <= 12; m++) {
+        stockTotal += (dividendData[m][stock] || 0);
+      }
+      
+      const card = document.createElement('div');
+      card.className = `stock-tab-card ${stock === currentStock ? 'active' : ''}`;
+      card.innerHTML = `
+        <span class="st-name">${stock}</span>
+        <span class="st-total">${stockTotal.toLocaleString()}원</span>
+      `;
+      card.addEventListener('click', () => {
         currentStock = stock;
         renderTabs();
         renderSelectedDetails();
       });
-      monthTabsContainer.appendChild(btn);
+      monthTabsContainer.appendChild(card);
     });
   }
 }
@@ -287,6 +352,7 @@ function renderSelectedDetails() {
           if (sLabel) sLabel.innerText = stTotal.toLocaleString() + '원';
         }
         
+        renderTabs();
         updateDashboard();
         updateChartData();
     });
@@ -299,8 +365,8 @@ function renderChart() {
   
   // gradient for bars
   const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-  gradient.addColorStop(0, 'rgba(16, 185, 129, 0.8)'); // emerald
-  gradient.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
+  gradient.addColorStop(0, 'rgba(79, 70, 229, 0.9)'); // Indigo
+  gradient.addColorStop(1, 'rgba(79, 70, 229, 0.2)');
 
   const labels = Array.from({length: 12}, (_, i) => `${i+1}월`);
   const data = labels.map((_, i) => getMonthTotal(i + 1));
@@ -319,7 +385,7 @@ function renderChart() {
         backgroundColor: gradient,
         borderRadius: 8,
         borderWidth: 0,
-        hoverBackgroundColor: '#a7f3d0'
+        hoverBackgroundColor: '#4338ca'
       }]
     },
     options: {
@@ -328,11 +394,15 @@ function renderChart() {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: 'rgba(15, 23, 42, 0.9)',
-          titleFont: { size: 14, family: "'Outfit', sans-serif" },
-          bodyFont: { size: 14, family: "'Outfit', sans-serif" },
-          padding: 12,
-          cornerRadius: 8,
+          backgroundColor: '#ffffff',
+          titleColor: '#0f172a',
+          bodyColor: '#4f46e5',
+          titleFont: { size: 14, family: "'Outfit', sans-serif", weight: 'bold' },
+          bodyFont: { size: 15, family: "'Outfit', sans-serif", weight: 'bold' },
+          borderColor: '#e2e8f0',
+          borderWidth: 1,
+          padding: 14,
+          cornerRadius: 16,
           displayColors: false,
           callbacks: {
             label: function(context) {
@@ -344,10 +414,10 @@ function renderChart() {
       scales: {
         y: {
           beginAtZero: true,
-          grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
+          grid: { color: '#f1f5f9', drawBorder: false },
           ticks: {
-            color: '#cbd5e1',
-            font: { family: "'Outfit', sans-serif" },
+            color: '#64748b',
+            font: { family: "'Outfit', sans-serif", weight: '500' },
             callback: function(value) {
               return value >= 1000 ? (value/1000) + 'k' : value;
             }
@@ -355,7 +425,7 @@ function renderChart() {
         },
         x: {
           grid: { display: false, drawBorder: false },
-          ticks: { color: '#cbd5e1', font: { family: "'Outfit', sans-serif" } }
+          ticks: { color: '#64748b', font: { family: "'Outfit', sans-serif", weight: '600' } }
         }
       }
     }
@@ -403,6 +473,14 @@ function renderSettingsList() {
 }
 
 function setupEventListeners() {
+  // Year selector
+  if (yearSelectorEl) {
+    yearSelectorEl.addEventListener('change', (e) => {
+      currentYear = parseInt(e.target.value);
+      loadData(); // Re-fetch data for the newly selected year
+    });
+  }
+
   // View mode toggles
   if(viewMonthBtn) {
     viewMonthBtn.addEventListener('click', () => {
@@ -427,12 +505,44 @@ function setupEventListeners() {
 
   // Modal toggle
   settingsBtn.addEventListener('click', () => {
+    if(goalInputEl) goalInputEl.value = yearlyGoal.toLocaleString();
     settingsModal.classList.add('show');
   });
 
   closeModalBtn.addEventListener('click', () => {
     settingsModal.classList.remove('show');
   });
+
+  // Goal Form
+  if (saveGoalBtn) {
+    saveGoalBtn.addEventListener('click', () => {
+      let raw = goalInputEl.value.replace(/[^0-9]/g, '');
+      let goal = parseInt(raw);
+      if(!isNaN(goal) && goal > 0) {
+        yearlyGoal = goal;
+        saveToFirebase();
+        updateDashboard();
+        
+        saveGoalBtn.innerText = '저장됨 ✓';
+        saveGoalBtn.style.background = '#10b981';
+        saveGoalBtn.style.color = '#fff';
+        setTimeout(() => {
+          saveGoalBtn.innerText = '저장';
+          saveGoalBtn.style.background = '#f1f5f9';
+          saveGoalBtn.style.color = 'var(--text-primary)';
+        }, 2000);
+      }
+    });
+
+    goalInputEl.addEventListener('input', function() {
+      let raw = this.value.replace(/[^0-9]/g, '');
+      if(raw) {
+        this.value = parseInt(raw).toLocaleString();
+      } else {
+        this.value = '';
+      }
+    });
+  }
 
   // Close modal when clicking outside
   settingsModal.addEventListener('click', (e) => {

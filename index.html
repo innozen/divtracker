@@ -42,10 +42,26 @@
     <main class="dashboard">
       <!-- Total Summary Card -->
       <section class="summary-card glass">
-        <h2><span id="current-year">2026</span>년 총 배당금</h2>
+        <h2>
+          <select id="year-selector" class="year-selector">
+            <!-- Options generated dynamically -->
+          </select>년 총 배당금
+        </h2>
         <div class="total-amount">
           <span id="total-dividend">0</span>
           <span class="currency">원</span>
+        </div>
+        
+        <!-- Progress Bar Section -->
+        <div class="progress-wrap">
+          <div class="progress-info">
+            <span class="progress-label">목표 달성률</span>
+            <span class="progress-percent" id="goal-percent">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="goal-fill"></div>
+          </div>
+          <div class="progress-target-text">목표 금액: <span id="goal-amount-text">0</span>원</div>
         </div>
       </section>
 
@@ -84,10 +100,23 @@
         </button>
       </div>
       <div class="modal-body">
-        <p class="modal-desc">관리할 주식 종목을 추가하거나 삭제하세요.</p>
+        <p class="modal-desc">올해의 목표 배당금과 관리할 종목을 설정하세요.</p>
         
+        <!-- Goal Setting -->
+        <div class="target-goal-form">
+          <label for="goal-input">올해 목표 금액 (원)</label>
+          <div class="input-wrapper-lg">
+            <input type="text" id="goal-input" inputmode="numeric" placeholder="예: 5000000">
+            <span>원</span>
+          </div>
+          <button id="save-goal-btn" class="btn secondary-btn">저장</button>
+        </div>
+        
+        <hr class="modal-hr">
+
+        <h3 class="modal-subtitle">보유 종목 관리</h3>
         <form id="add-stock-form" class="add-stock-form">
-          <input type="text" id="new-stock-input" placeholder="새 종목 이름 (예: AAPL, 삼성전자)" required>
+          <input type="text" id="new-stock-input" placeholder="새 종목 이름 (예: AAPL)" required>
           <button type="submit" class="btn primary-btn"><i class="fa-solid fa-plus"></i> 추가</button>
         </form>
 
