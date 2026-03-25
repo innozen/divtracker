@@ -12,53 +12,119 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Default Data
-const defaultStocks = [
-  "TIGER S&P500",
-  "TIGER 미국배당다우존스",
-  "KODEX 미국 나스닥 100",
-  "맥쿼리인프라",
-  "PLUS 고배당주",
-  "SOL 코리아고배당",
-  "KODEX 미국배당커버드콜액티브",
-  "KODEX 미국AI테크TOP10",
-  "RISE 미국테크100데일리고정커버드콜",
-  "KODEX 미국AI전력핵심인프라",
+// ── Default Stocks ──────────────────────────────────────────
+const defaultStocksKRW = [
+  "TIGER S&P500", "TIGER 미국배당다우존스", "KODEX 미국 나스닥 100",
+  "맥쿼리인프라", "PLUS 고배당주", "SOL 코리아고배당",
+  "KODEX 미국배당커버드콜액티브", "KODEX 미국AI테크TOP10",
+  "RISE 미국테크100데일리고정커버드콜", "KODEX 미국AI전력핵심인프라",
   "KODEX 미국서학개미"
 ];
 
-// State
-let stocks = [];
-let dividendData = {}; // "1" ~ "12" mapping to stock amounts
-let myChart = null;
-let currentYear = 2026;
+const defaultStocksUSD = ['DIVO', 'SPYI', 'QQQI', 'SPMO', 'SCHD'];
+
+// ── Pre-seeded data for Account 2 (USD) ─────────────────────
+const acc2Seed = {
+  2025: {
+    stocks: ['DIVO','SPYI','QQQI','SPMO','SCHD'],
+    yearlyGoal: 100,
+    dividendData: {
+      1:{DIVO:0,    SPYI:0,    QQQI:0,    SPMO:0,    SCHD:0},
+      2:{DIVO:0,    SPYI:0,    QQQI:0,    SPMO:0,    SCHD:0},
+      3:{DIVO:0,    SPYI:0,    QQQI:0,    SPMO:0,    SCHD:0},
+      4:{DIVO:0,    SPYI:0,    QQQI:0,    SPMO:0,    SCHD:0},
+      5:{DIVO:0,    SPYI:0,    QQQI:0,    SPMO:0,    SCHD:0},
+      6:{DIVO:0,    SPYI:0,    QQQI:0,    SPMO:0.72, SCHD:0.66},
+      7:{DIVO:0.44, SPYI:0.87, QQQI:0,    SPMO:0,    SCHD:0},
+      8:{DIVO:0.45, SPYI:1.32, QQQI:0,    SPMO:0,    SCHD:0},
+      9:{DIVO:0.6,  SPYI:1.79, QQQI:0,    SPMO:1.14, SCHD:0.44},
+      10:{DIVO:0.93,SPYI:3.14, QQQI:0,    SPMO:0,    SCHD:0},
+      11:{DIVO:1.27,SPYI:3.1,  QQQI:1.07, SPMO:0,    SCHD:0},
+      12:{DIVO:6.29,SPYI:3.16, QQQI:1.63, SPMO:2.23, SCHD:0}
+    }
+  },
+  2026: {
+    stocks: ['DIVO','SPYI','QQQI','SPMO','SCHD'],
+    yearlyGoal: 100,
+    dividendData: {
+      1:{DIVO:1.09, SPYI:3.16, QQQI:2.7,  SPMO:0, SCHD:0},
+      2:{DIVO:1.11, SPYI:3.55, QQQI:3.65, SPMO:0, SCHD:0},
+      3:{DIVO:0, SPYI:0, QQQI:0, SPMO:0, SCHD:0},
+      4:{DIVO:0, SPYI:0, QQQI:0, SPMO:0, SCHD:0},
+      5:{DIVO:0, SPYI:0, QQQI:0, SPMO:0, SCHD:0},
+      6:{DIVO:0, SPYI:0, QQQI:0, SPMO:0, SCHD:0},
+      7:{DIVO:0, SPYI:0, QQQI:0, SPMO:0, SCHD:0},
+      8:{DIVO:0, SPYI:0, QQQI:0, SPMO:0, SCHD:0},
+      9:{DIVO:0, SPYI:0, QQQI:0, SPMO:0, SCHD:0},
+      10:{DIVO:0, SPYI:0, QQQI:0, SPMO:0, SCHD:0},
+      11:{DIVO:0, SPYI:0, QQQI:0, SPMO:0, SCHD:0},
+      12:{DIVO:0, SPYI:0, QQQI:0, SPMO:0, SCHD:0}
+    }
+  }
+};
+
+// ── Stock Color Palette ──────────────────────────────────────
+const STOCK_COLORS = [
+  '#6366f1','#06b6d4','#10b981','#f59e0b',
+  '#ef4444','#8b5cf6','#ec4899','#14b8a6',
+  '#f97316','#3b82f6','#84cc16'
+];
+function getStockColor(i) { return STOCK_COLORS[i % STOCK_COLORS.length]; }
+
+// ── State ────────────────────────────────────────────────────
+let stocks       = [];
+let dividendData = {};
+let myChart      = null;
+let currentYear  = 2026;
 let currentMonth = new Date().getMonth() + 1;
-let viewMode = 'month'; // 'month' or 'stock'
+let viewMode     = 'month';
 let currentStock = '';
-let yearlyGoal = 5000000;
+let yearlyGoal   = 5000000;
+let currentAccount = 1; // 1 = KRW, 2 = USD
 
-// Elements
-const yearSelectorEl = document.getElementById('year-selector');
-const totalDividendEl = document.getElementById('total-dividend');
-const monthTabsContainer = document.getElementById('month-tabs');
+// ── Helpers ──────────────────────────────────────────────────
+const isUSD         = () => currentAccount === 2;
+const getDbKey      = () => currentAccount === 1 ? `divTracker_${currentYear}` : `divTracker_usd_${currentYear}`;
+const getDefStocks  = () => isUSD() ? [...defaultStocksUSD] : [...defaultStocksKRW];
+const getDefGoal    = () => isUSD() ? 100 : 5000000;
+
+function formatTotal(val) {
+  if (isUSD()) return '$' + parseFloat(val || 0).toFixed(2);
+  return parseInt(val || 0).toLocaleString() + '원';
+}
+function parseVal(str) {
+  if (isUSD()) return parseFloat(String(str).replace(/[^0-9.]/g, '')) || 0;
+  return parseInt(String(str).replace(/[^0-9]/g, '')) || 0;
+}
+function displayInputVal(val) {
+  if (isUSD()) return parseFloat(val) > 0 ? parseFloat(val).toFixed(2) : '';
+  return parseInt(val) > 0 ? parseInt(val).toLocaleString() : '';
+}
+
+// ── Elements ─────────────────────────────────────────────────
+const yearSelectorEl       = document.getElementById('year-selector');
+const totalDividendEl      = document.getElementById('total-dividend');
+const currencyLabelEl      = document.getElementById('currency-label');
+const monthTabsContainer   = document.getElementById('month-tabs');
 const monthDetailContainer = document.getElementById('month-detail-container');
-const viewMonthBtn = document.getElementById('view-month-btn');
-const viewStockBtn = document.getElementById('view-stock-btn');
-const settingsBtn = document.getElementById('settings-btn');
-const closeModalBtn = document.getElementById('close-modal-btn');
-const settingsModal = document.getElementById('settings-modal');
-const stockListEl = document.getElementById('stock-list');
-const addStockForm = document.getElementById('add-stock-form');
-const newStockInput = document.getElementById('new-stock-input');
+const viewMonthBtn         = document.getElementById('view-month-btn');
+const viewStockBtn         = document.getElementById('view-stock-btn');
+const settingsBtn          = document.getElementById('settings-btn');
+const closeModalBtn        = document.getElementById('close-modal-btn');
+const settingsModal        = document.getElementById('settings-modal');
+const stockListEl          = document.getElementById('stock-list');
+const addStockForm         = document.getElementById('add-stock-form');
+const newStockInput        = document.getElementById('new-stock-input');
+const acc1Btn              = document.getElementById('acc1-btn');
+const acc2Btn              = document.getElementById('acc2-btn');
+const goalLabelUnitEl      = document.getElementById('goal-label-unit');
+const goalPercentEl        = document.getElementById('goal-percent');
+const goalFillEl           = document.getElementById('goal-fill');
+const goalAmountTextEl     = document.getElementById('goal-amount-text');
+const goalInputEl          = document.getElementById('goal-input');
+const saveGoalBtn          = document.getElementById('save-goal-btn');
 
-// Goal Elements
-const goalPercentEl = document.getElementById('goal-percent');
-const goalFillEl = document.getElementById('goal-fill');
-const goalAmountTextEl = document.getElementById('goal-amount-text');
-const goalInputEl = document.getElementById('goal-input');
-const saveGoalBtn = document.getElementById('save-goal-btn');
-
-// Init
+// ── Init ─────────────────────────────────────────────────────
 function init() {
   initYearSelector();
   setupEventListeners();
@@ -68,77 +134,87 @@ function init() {
 function initYearSelector() {
   if (!yearSelectorEl) return;
   yearSelectorEl.innerHTML = '';
-  
   const startYear = 2025;
-  const currentSysYear = new Date().getFullYear();
-  const maxYear = Math.max(currentSysYear + 1, currentYear); // up to next year for planning
-  
+  const maxYear   = Math.max(new Date().getFullYear() + 1, currentYear);
   for (let y = startYear; y <= maxYear; y++) {
     const opt = document.createElement('option');
-    opt.value = y;
-    opt.innerText = y;
+    opt.value = y; opt.innerText = y;
     yearSelectorEl.appendChild(opt);
   }
-  
   yearSelectorEl.value = currentYear;
 }
 
-// Load from Firebase
+// ── Firebase ─────────────────────────────────────────────────
 function loadData() {
-  const dbRef = db.ref();
-  dbRef.child(`divTracker_${currentYear}`).get().then((snapshot) => {
+  db.ref().child(getDbKey()).get().then((snapshot) => {
     if (snapshot.exists()) {
       const data = snapshot.val();
-      stocks = data.stocks || [...defaultStocks];
+      stocks       = data.stocks       || getDefStocks();
       dividendData = data.dividendData || {};
-      yearlyGoal = data.yearlyGoal || 5000000;
-      for (let i = 1; i <= 12; i++) {
-        if (!dividendData[i]) dividendData[i] = {};
+      yearlyGoal   = data.yearlyGoal   || getDefGoal();
+      
+      // ── Data Migration: QQQQI -> QQQI ─────────────────────
+      if (isUSD()) {
+        let migrated = false;
+        // 1. Stocks list migration
+        stocks = stocks.map(st => {
+          if (st === 'QQQQI') { migrated = true; return 'QQQI'; }
+          return st;
+        });
+        // 2. dividendData keys migration
+        for (let m = 1; m <= 12; m++) {
+          if (dividendData[m] && dividendData[m]['QQQQI'] !== undefined) {
+            dividendData[m]['QQQI'] = (dividendData[m]['QQQI'] || 0) + dividendData[m]['QQQQI'];
+            delete dividendData[m]['QQQQI'];
+            migrated = true;
+          }
+        }
+        if (migrated) saveToFirebase();
       }
+      // ──────────────────────────────────────────────────────
+      
+      for (let i = 1; i <= 12; i++) if (!dividendData[i]) dividendData[i] = {};
     } else {
-      stocks = [...defaultStocks];
-      for (let i = 1; i <= 12; i++) {
-        dividendData[i] = {};
-        stocks.forEach(stock => dividendData[i][stock] = 0);
+      // Seed account 2 data on first load
+      if (isUSD() && acc2Seed[currentYear]) {
+        const s   = acc2Seed[currentYear];
+        stocks       = [...s.stocks];
+        dividendData = JSON.parse(JSON.stringify(s.dividendData));
+        yearlyGoal   = s.yearlyGoal;
+      } else {
+        stocks     = getDefStocks();
+        yearlyGoal = getDefGoal();
+        for (let i = 1; i <= 12; i++) {
+          dividendData[i] = {};
+          stocks.forEach(st => dividendData[i][st] = 0);
+        }
       }
       saveToFirebase();
     }
     if (stocks.length > 0 && !currentStock) currentStock = stocks[0];
     renderApp();
-  }).catch((error) => {
-    console.error("Firebase fetch error:", error);
-    alert("데이터를 가져오는 중 오류가 발생했습니다.");
+  }).catch(err => {
+    console.error('Firebase error:', err);
+    alert('데이터를 가져오는 중 오류가 발생했습니다.');
   });
 }
 
 function saveToFirebase() {
-  db.ref(`divTracker_${currentYear}`).set({
-    stocks: stocks,
-    dividendData: dividendData,
-    yearlyGoal: yearlyGoal
-  });
+  db.ref(getDbKey()).set({ stocks, dividendData, yearlyGoal });
 }
 
-// Save Stocks (wrapper)
 function saveStocks() {
   for (let i = 1; i <= 12; i++) {
-    if(!dividendData[i]) dividendData[i] = {};
-    stocks.forEach(stock => {
-      if (dividendData[i][stock] === undefined) {
-        dividendData[i][stock] = 0;
-      }
-    });
+    if (!dividendData[i]) dividendData[i] = {};
+    stocks.forEach(st => { if (dividendData[i][st] === undefined) dividendData[i][st] = 0; });
   }
   saveToFirebase();
 }
+const saveData = saveToFirebase;
 
-// Save Data (wrapper)
-function saveData() {
-  saveToFirebase();
-}
-
-// Render everything
+// ── Render All ───────────────────────────────────────────────
 function renderApp() {
+  updateAccountUI();
   updateDashboard();
   renderTabs();
   renderSelectedDetails();
@@ -146,37 +222,39 @@ function renderApp() {
   renderSettingsList();
 }
 
-// Update Dashboard Total
+function updateAccountUI() {
+  if (acc1Btn) acc1Btn.classList.toggle('active', currentAccount === 1);
+  if (acc2Btn) acc2Btn.classList.toggle('active', currentAccount === 2);
+  if (goalLabelUnitEl) goalLabelUnitEl.innerText = isUSD() ? '($)' : '(원)';
+}
+
+// ── Dashboard ────────────────────────────────────────────────
 function updateDashboard() {
-  let yearlyTotal = 0;
-  for (let m = 1; m <= 12; m++) {
-    yearlyTotal += getMonthTotal(m);
+  let total = 0;
+  for (let m = 1; m <= 12; m++) total += getMonthTotal(m);
+
+  if (isUSD()) {
+    totalDividendEl.innerText = '$' + total.toFixed(2);
+    if (currencyLabelEl) currencyLabelEl.style.display = 'none';
+  } else {
+    totalDividendEl.innerText = total.toLocaleString();
+    if (currencyLabelEl) currencyLabelEl.style.display = '';
   }
-  totalDividendEl.innerText = yearlyTotal.toLocaleString();
-  
-  if (goalAmountTextEl) goalAmountTextEl.innerText = yearlyGoal.toLocaleString();
-  
-  let percent = 0;
-  if(yearlyGoal > 0) {
-    percent = (yearlyTotal / yearlyGoal) * 100;
-  }
-  
-  // Format nicely (e.g. 42.5%)
-  const displayPercent = yearlyGoal > 0 ? ((yearlyTotal / yearlyGoal) * 100).toFixed(1) : 0;
-  
-  if (goalPercentEl) goalPercentEl.innerText = `${displayPercent}%`;
-  
+
+  if (goalAmountTextEl) goalAmountTextEl.innerText = isUSD() ? '$' + parseFloat(yearlyGoal).toFixed(2) : yearlyGoal.toLocaleString() + '원';
+
+  const pct = yearlyGoal > 0 ? (total / yearlyGoal) * 100 : 0;
+  if (goalPercentEl) goalPercentEl.innerText = `${yearlyGoal > 0 ? pct.toFixed(1) : 0}%`;
+
   if (goalFillEl) {
     setTimeout(() => {
-      let widthPercent = percent > 100 ? 100 : percent;
-      goalFillEl.style.width = `${widthPercent}%`;
-      
-      if(percent >= 100) {
-        goalFillEl.style.background = 'linear-gradient(90deg, #f59e0b, #eab308)'; // Golden when done
-        goalPercentEl.style.color = '#f59e0b';
+      goalFillEl.style.width = `${Math.min(pct, 100)}%`;
+      if (pct >= 100) {
+        goalFillEl.style.background = 'linear-gradient(90deg, #f59e0b, #eab308)';
+        goalPercentEl.style.color   = '#f59e0b';
       } else {
-        goalFillEl.style.background = 'linear-gradient(90deg, #818cf8, #4f46e5)'; // Standard Indigo
-        goalPercentEl.style.color = 'var(--accent-color)';
+        goalFillEl.style.background = 'linear-gradient(90deg, #818cf8, #4f46e5)';
+        goalPercentEl.style.color   = 'var(--accent-color)';
       }
     }, 100);
   }
@@ -184,345 +262,324 @@ function updateDashboard() {
 
 function getMonthTotal(month) {
   let total = 0;
-  if(dividendData[month]) {
-    for (const stock in dividendData[month]) {
-      // make sure the stock still exists in the list
-      if(stocks.includes(stock)) {
-          total += Number(dividendData[month][stock]) || 0;
-      }
+  if (dividendData[month]) {
+    for (const st in dividendData[month]) {
+      if (stocks.includes(st)) total += Number(dividendData[month][st]) || 0;
     }
   }
-  return total;
+  return isUSD() ? parseFloat(total.toFixed(2)) : total;
 }
 
-// Render Tabs (Month or Stock view)
+// ── Tabs ─────────────────────────────────────────────────────
 function renderTabs() {
   monthTabsContainer.innerHTML = '';
-  
+
   if (viewMode === 'month') {
     monthTabsContainer.className = 'month-tabs';
     for (let m = 1; m <= 12; m++) {
       const btn = document.createElement('button');
       btn.className = `month-tab-btn ${m === currentMonth ? 'active' : ''}`;
       btn.innerText = `${m}월`;
-      btn.addEventListener('click', () => {
-        currentMonth = m;
-        renderTabs();
-        renderSelectedDetails();
-      });
+      btn.addEventListener('click', () => { currentMonth = m; renderTabs(); renderSelectedDetails(); });
       monthTabsContainer.appendChild(btn);
     }
   } else {
     monthTabsContainer.className = 'stock-tabs';
     stocks.forEach(stock => {
-      let stockTotal = 0;
-      for (let m = 1; m <= 12; m++) {
-        stockTotal += (dividendData[m][stock] || 0);
-      }
-      
+      let tot = 0;
+      for (let m = 1; m <= 12; m++) tot += Number(dividendData[m][stock]) || 0;
+      if (isUSD()) tot = parseFloat(tot.toFixed(2));
+
       const card = document.createElement('div');
       card.className = `stock-tab-card ${stock === currentStock ? 'active' : ''}`;
+      card.style.setProperty('--stock-color', getStockColor(stocks.indexOf(stock)));
       card.innerHTML = `
         <span class="st-name">${stock}</span>
-        <span class="st-total">${stockTotal.toLocaleString()}원</span>
+        <span class="st-total">${isUSD() ? '$'+tot.toFixed(2) : tot.toLocaleString()+'원'}</span>
       `;
-      card.addEventListener('click', () => {
-        currentStock = stock;
-        renderTabs();
-        renderSelectedDetails();
-      });
+      card.addEventListener('click', () => { currentStock = stock; renderTabs(); renderSelectedDetails(); });
       monthTabsContainer.appendChild(card);
     });
   }
 }
 
-// Render Selected Details pane
+// ── Detail Pane ──────────────────────────────────────────────
 function renderSelectedDetails() {
   if (!monthDetailContainer) return;
   monthDetailContainer.innerHTML = '';
-  
+
+  const suffix       = isUSD() ? '$' : '원';
+  const inputMode    = isUSD() ? 'decimal' : 'numeric';
+
   if (viewMode === 'month') {
-    const monthTotal = getMonthTotal(currentMonth);
-
-    const header = document.createElement('div');
-    header.className = 'month-total-header';
-    header.innerHTML = `
-      <h4>${currentMonth}월 상세 내역</h4>
-      <span class="total-val" id="current-month-total">${monthTotal.toLocaleString()}원</span>
-    `;
-    monthDetailContainer.appendChild(header);
-
-    const hr = document.createElement('hr');
-    monthDetailContainer.appendChild(hr);
+    const hdr = document.createElement('div');
+    hdr.className = 'month-total-header';
+    hdr.innerHTML = `<h4>${currentMonth}월 상세 내역</h4><span class="total-val" id="current-month-total">${formatTotal(getMonthTotal(currentMonth))}</span>`;
+    monthDetailContainer.appendChild(hdr);
+    monthDetailContainer.appendChild(document.createElement('hr'));
 
     const grid = document.createElement('div');
     grid.className = 'dividend-grid';
-
     stocks.forEach(stock => {
-      const val = dividendData[currentMonth][stock] || 0;
-      const inputGroup = document.createElement('div');
-      inputGroup.className = 'input-group';
-      inputGroup.innerHTML = `
+      const row = document.createElement('div');
+      row.className = 'input-group';
+      row.innerHTML = `
         <span class="input-label" title="${stock}">${stock}</span>
         <div class="input-wrapper">
-          <input type="text" inputmode="numeric" 
-                 data-month="${currentMonth}" data-stock="${stock}" 
-                 value="${val === 0 ? '' : val.toLocaleString()}" 
-                 placeholder="0">
-          <span class="input-suffix">원</span>
-        </div>
-      `;
-      grid.appendChild(inputGroup);
+          <input type="text" inputmode="${inputMode}" data-month="${currentMonth}" data-stock="${stock}"
+                 value="${displayInputVal(dividendData[currentMonth][stock])}" placeholder="0">
+          <span class="input-suffix">${suffix}</span>
+        </div>`;
+      grid.appendChild(row);
     });
-
     monthDetailContainer.appendChild(grid);
+
   } else {
-    // Stock View mode
-    let stockTotal = 0;
-    for (let m = 1; m <= 12; m++) {
-       stockTotal += (dividendData[m][currentStock] || 0);
-    }
+    let stTot = 0;
+    for (let m = 1; m <= 12; m++) stTot += Number(dividendData[m][currentStock]) || 0;
+    if (isUSD()) stTot = parseFloat(stTot.toFixed(2));
 
-    const header = document.createElement('div');
-    header.className = 'month-total-header';
-    header.innerHTML = `
-      <h4>${currentStock} 상세 내역</h4>
-      <span class="total-val" id="current-stock-total">${stockTotal.toLocaleString()}원</span>
-    `;
-    monthDetailContainer.appendChild(header);
-
-    const hr = document.createElement('hr');
-    monthDetailContainer.appendChild(hr);
+    const hdr = document.createElement('div');
+    hdr.className = 'month-total-header';
+    hdr.innerHTML = `<h4>${currentStock} 상세 내역</h4><span class="total-val" id="current-stock-total">${formatTotal(stTot)}</span>`;
+    monthDetailContainer.appendChild(hdr);
+    monthDetailContainer.appendChild(document.createElement('hr'));
 
     const grid = document.createElement('div');
     grid.className = 'dividend-grid';
-
-    for(let m = 1; m <= 12; m++) {
-      const val = dividendData[m][currentStock] || 0;
-      const inputGroup = document.createElement('div');
-      inputGroup.className = 'input-group';
-      inputGroup.innerHTML = `
+    for (let m = 1; m <= 12; m++) {
+      const row = document.createElement('div');
+      row.className = 'input-group';
+      row.innerHTML = `
         <span class="input-label">${m}월</span>
         <div class="input-wrapper">
-          <input type="text" inputmode="numeric" 
-                 data-month="${m}" data-stock="${currentStock}" 
-                 value="${val === 0 ? '' : val.toLocaleString()}" 
-                 placeholder="0">
-          <span class="input-suffix">원</span>
-        </div>
-      `;
-      grid.appendChild(inputGroup);
+          <input type="text" inputmode="${inputMode}" data-month="${m}" data-stock="${currentStock}"
+                 value="${displayInputVal(dividendData[m][currentStock])}" placeholder="0">
+          <span class="input-suffix">${suffix}</span>
+        </div>`;
+      grid.appendChild(row);
     }
     monthDetailContainer.appendChild(grid);
   }
 
-  // Attach input events
-  const inputs = monthDetailContainer.querySelectorAll('input');
-  inputs.forEach(input => {
+  attachInputEvents();
+}
+
+function attachInputEvents() {
+  monthDetailContainer.querySelectorAll('input').forEach(input => {
+
     input.addEventListener('focus', function() {
-        const raw = this.value.replace(/,/g, '');
-        this.value = raw === '0' ? '' : raw;
+      const raw = this.value.replace(/,/g, '');
+      this.value = (raw === '0' || raw === '0.00') ? '' : raw;
     });
 
     input.addEventListener('blur', function() {
-        let raw = this.value.replace(/,/g, '');
-        if(!raw || isNaN(raw)) raw = 0;
-        else raw = parseInt(raw);
-        
-        this.value = raw === 0 ? '' : raw.toLocaleString();
+      if (isUSD()) {
+        const n = parseFloat(this.value.replace(/[^0-9.]/g, '')) || 0;
+        this.value = n === 0 ? '' : n.toFixed(2);
+      } else {
+        const n = parseInt(this.value.replace(/[^0-9]/g, '')) || 0;
+        this.value = n === 0 ? '' : n.toLocaleString();
+      }
     });
 
-    input.addEventListener('input', function(e) {
+    input.addEventListener('input', function() {
+      if (isUSD()) {
+        this.value = this.value.replace(/[^0-9.]/g, '');
+        const pts = this.value.split('.');
+        if (pts.length > 2) this.value = pts[0] + '.' + pts.slice(1).join('');
+      } else {
         this.value = this.value.replace(/[^0-9]/g, '');
-        
-        const m = this.dataset.month;
-        const s = this.dataset.stock;
-        let amount = parseInt(this.value) || 0;
-        
-        dividendData[m][s] = amount;
-        saveData();
-        
-        if (viewMode === 'month') {
-          const mLabel = document.getElementById('current-month-total');
-          if (mLabel) mLabel.innerText = getMonthTotal(m).toLocaleString() + '원';
-        } else {
-          let stTotal = 0;
-          for(let tm=1; tm<=12; tm++) stTotal += (dividendData[tm][currentStock] || 0);
-          const sLabel = document.getElementById('current-stock-total');
-          if (sLabel) sLabel.innerText = stTotal.toLocaleString() + '원';
-        }
-        
-        renderTabs();
-        updateDashboard();
-        updateChartData();
+      }
+
+      const m = this.dataset.month;
+      const s = this.dataset.stock;
+      dividendData[m][s] = isUSD() ? (parseFloat(this.value) || 0) : (parseInt(this.value) || 0);
+      saveData();
+
+      // Pulse animation
+      const grp = this.closest('.input-group');
+      if (grp) {
+        grp.classList.remove('pulse-anim');
+        void grp.offsetWidth;
+        grp.classList.add('pulse-anim');
+        grp.addEventListener('animationend', () => grp.classList.remove('pulse-anim'), { once: true });
+      }
+
+      // Roll total
+      if (viewMode === 'month') {
+        const lbl = document.getElementById('current-month-total');
+        if (lbl) animateCount(lbl, getMonthTotal(m));
+      } else {
+        let tot = 0;
+        for (let tm = 1; tm <= 12; tm++) tot += Number(dividendData[tm][currentStock]) || 0;
+        if (isUSD()) tot = parseFloat(tot.toFixed(2));
+        const lbl = document.getElementById('current-stock-total');
+        if (lbl) animateCount(lbl, tot);
+      }
+
+      renderTabs();
+      updateDashboard();
+      updateChartData();
     });
   });
 }
 
-// Render Chart
+// ── Chart ────────────────────────────────────────────────────
 function renderChart() {
   const ctx = document.getElementById('dividendChart').getContext('2d');
-  
-  // gradient for bars
   const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-  gradient.addColorStop(0, 'rgba(79, 70, 229, 0.9)'); // Indigo
-  gradient.addColorStop(1, 'rgba(79, 70, 229, 0.2)');
+  gradient.addColorStop(0, 'rgba(79,70,229,0.9)');
+  gradient.addColorStop(1, 'rgba(79,70,229,0.2)');
 
-  const labels = Array.from({length: 12}, (_, i) => `${i+1}월`);
-  const data = labels.map((_, i) => getMonthTotal(i + 1));
+  const labels = Array.from({length:12}, (_,i) => `${i+1}월`);
+  const data   = labels.map((_,i) => getMonthTotal(i+1));
 
-  if(myChart) {
-    myChart.destroy();
-  }
+  if (myChart) myChart.destroy();
 
   myChart = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: '월별 배당금',
-        data: data,
-        backgroundColor: gradient,
-        borderRadius: 8,
-        borderWidth: 0,
-        hoverBackgroundColor: '#4338ca'
-      }]
-    },
+    data: { labels, datasets: [{ label:'월별 배당금', data, backgroundColor: gradient, borderRadius:8, borderWidth:0, hoverBackgroundColor:'#4338ca' }] },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#ffffff',
-          titleColor: '#0f172a',
-          bodyColor: '#4f46e5',
-          titleFont: { size: 14, family: "'Outfit', sans-serif", weight: 'bold' },
-          bodyFont: { size: 15, family: "'Outfit', sans-serif", weight: 'bold' },
-          borderColor: '#e2e8f0',
-          borderWidth: 1,
-          padding: 14,
-          cornerRadius: 16,
-          displayColors: false,
-          callbacks: {
-            label: function(context) {
-              return context.parsed.y.toLocaleString() + ' 원';
-            }
-          }
+          backgroundColor:'#ffffff', titleColor:'#0f172a', bodyColor:'#4f46e5',
+          titleFont:{ size:14, family:"'Outfit',sans-serif", weight:'bold' },
+          bodyFont:{ size:15, family:"'Outfit',sans-serif", weight:'bold' },
+          borderColor:'#e2e8f0', borderWidth:1, padding:14, cornerRadius:16, displayColors:false,
+          callbacks: { label: ctx => isUSD() ? '$'+ctx.parsed.y.toFixed(2) : ctx.parsed.y.toLocaleString()+' 원' }
         }
       },
       scales: {
         y: {
           beginAtZero: true,
-          grid: { color: '#f1f5f9', drawBorder: false },
+          grid: { color:'#f1f5f9', drawBorder:false },
           ticks: {
-            color: '#64748b',
-            font: { family: "'Outfit', sans-serif", weight: '500' },
-            callback: function(value) {
-              return value >= 1000 ? (value/1000) + 'k' : value;
-            }
+            color:'#64748b', font:{ family:"'Outfit',sans-serif", weight:'500' },
+            callback: v => isUSD() ? '$'+parseFloat(v).toFixed(2) : (v>=1000 ? (v/1000)+'k' : v)
           }
         },
-        x: {
-          grid: { display: false, drawBorder: false },
-          ticks: { color: '#64748b', font: { family: "'Outfit', sans-serif", weight: '600' } }
-        }
+        x: { grid:{ display:false, drawBorder:false }, ticks:{ color:'#64748b', font:{ family:"'Outfit',sans-serif", weight:'600' } } }
       }
     }
   });
 }
 
 function updateChartData() {
-  if(!myChart) return;
-  const newData = Array.from({length: 12}, (_, i) => getMonthTotal(i + 1));
-  myChart.data.datasets[0].data = newData;
+  if (!myChart) return;
+  myChart.data.datasets[0].data = Array.from({length:12}, (_,i) => getMonthTotal(i+1));
   myChart.update();
 }
 
-// Settings Modal Logic
+function animateCount(el, value) {
+  el.classList.remove('count-anim');
+  void el.offsetWidth;
+  el.innerText = formatTotal(value);
+  el.classList.add('count-anim');
+  el.addEventListener('animationend', () => el.classList.remove('count-anim'), { once: true });
+}
+
+// ── Settings ─────────────────────────────────────────────────
 function renderSettingsList() {
   stockListEl.innerHTML = '';
-  stocks.forEach((stock, index) => {
+  stocks.forEach((stock, idx) => {
     const li = document.createElement('li');
     li.className = 'stock-item';
     li.innerHTML = `
       <span class="stock-name">${stock}</span>
-      <button class="delete-btn" data-index="${index}" title="삭제">
-        <i class="fa-solid fa-trash-can"></i>
-      </button>
-    `;
+      <button class="delete-btn" data-index="${idx}" title="삭제"><i class="fa-solid fa-trash-can"></i></button>`;
     stockListEl.appendChild(li);
   });
 
-  // Delete event listeners
-  const deleteBtns = stockListEl.querySelectorAll('.delete-btn');
-  deleteBtns.forEach(btn => {
+  stockListEl.querySelectorAll('.delete-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       const idx = this.dataset.index;
-      const deletedStock = stocks[idx];
-      
-      // confirm delete
-      if(confirm(`'${deletedStock}' 종목을 정말 삭제하시겠습니까? 입력된 배당금 내역도 함께 보이지 않게 됩니다.`)) {
+      const del = stocks[idx];
+      if (confirm(`'${del}' 종목을 정말 삭제하시겠습니까?`)) {
         stocks.splice(idx, 1);
         saveStocks();
         renderSettingsList();
-        renderApp(); // re-render the whole app to reflect state change
+        renderApp();
       }
     });
   });
 }
 
+// ── Event Listeners ──────────────────────────────────────────
 function setupEventListeners() {
   // Year selector
   if (yearSelectorEl) {
-    yearSelectorEl.addEventListener('change', (e) => {
-      currentYear = parseInt(e.target.value);
-      loadData(); // Re-fetch data for the newly selected year
+    yearSelectorEl.addEventListener('change', e => {
+      currentYear  = parseInt(e.target.value);
+      currentStock = '';
+      loadData();
+    });
+  }
+
+  // Account toggle
+  if (acc1Btn) {
+    acc1Btn.addEventListener('click', () => {
+      if (currentAccount === 1) return;
+      currentAccount = 1;
+      currentStock   = '';
+      yearlyGoal     = 5000000;
+      loadData();
+    });
+  }
+  if (acc2Btn) {
+    acc2Btn.addEventListener('click', () => {
+      if (currentAccount === 2) return;
+      currentAccount = 2;
+      currentStock   = '';
+      yearlyGoal     = 100;
+      loadData();
     });
   }
 
   // View mode toggles
-  if(viewMonthBtn) {
+  if (viewMonthBtn) {
     viewMonthBtn.addEventListener('click', () => {
       viewMode = 'month';
       viewMonthBtn.classList.add('active');
       viewStockBtn.classList.remove('active');
-      renderTabs();
-      renderSelectedDetails();
+      renderTabs(); renderSelectedDetails();
     });
   }
-  
-  if(viewStockBtn) {
+  if (viewStockBtn) {
     viewStockBtn.addEventListener('click', () => {
       viewMode = 'stock';
       if (!currentStock && stocks.length > 0) currentStock = stocks[0];
       viewStockBtn.classList.add('active');
       viewMonthBtn.classList.remove('active');
-      renderTabs();
-      renderSelectedDetails();
+      renderTabs(); renderSelectedDetails();
     });
   }
 
-  // Modal toggle
+  // Modal
   settingsBtn.addEventListener('click', () => {
-    if(goalInputEl) goalInputEl.value = yearlyGoal.toLocaleString();
+    if (goalInputEl) {
+      if (isUSD()) {
+        goalInputEl.value = Math.floor(yearlyGoal); // USD일 경우 소수점 없이 숫자만
+      } else {
+        goalInputEl.value = parseInt(yearlyGoal).toLocaleString();
+      }
+    }
     settingsModal.classList.add('show');
   });
+  closeModalBtn.addEventListener('click', () => settingsModal.classList.remove('show'));
+  settingsModal.addEventListener('click', e => { if (e.target === settingsModal) settingsModal.classList.remove('show'); });
 
-  closeModalBtn.addEventListener('click', () => {
-    settingsModal.classList.remove('show');
-  });
-
-  // Goal Form
+  // Goal save
   if (saveGoalBtn) {
     saveGoalBtn.addEventListener('click', () => {
-      let raw = goalInputEl.value.replace(/[^0-9]/g, '');
-      let goal = parseInt(raw);
-      if(!isNaN(goal) && goal > 0) {
+      const raw = goalInputEl.value.replace(/[^0-9.]/g, '');
+      const goal = isUSD() ? parseFloat(raw) : parseInt(raw);
+      if (!isNaN(goal) && goal > 0) {
         yearlyGoal = goal;
         saveToFirebase();
         updateDashboard();
-        
         saveGoalBtn.innerText = '저장됨 ✓';
         saveGoalBtn.style.background = '#10b981';
         saveGoalBtn.style.color = '#fff';
@@ -535,38 +592,32 @@ function setupEventListeners() {
     });
 
     goalInputEl.addEventListener('input', function() {
-      let raw = this.value.replace(/[^0-9]/g, '');
-      if(raw) {
-        this.value = parseInt(raw).toLocaleString();
+      let raw = this.value.replace(/[^0-9.]/g, '');
+      if (raw && !isUSD()) {
+        const n = parseInt(raw);
+        if (!isNaN(n)) this.value = n.toLocaleString();
       } else {
-        this.value = '';
+        this.value = raw;
       }
     });
   }
 
-  // Close modal when clicking outside
-  settingsModal.addEventListener('click', (e) => {
-    if(e.target === settingsModal) {
-        settingsModal.classList.remove('show');
-    }
-  });
-
   // Add stock
-  addStockForm.addEventListener('submit', (e) => {
+  addStockForm.addEventListener('submit', e => {
     e.preventDefault();
-    const newStock = newStockInput.value.trim();
-    if(newStock && !stocks.includes(newStock)) {
-      stocks.push(newStock);
-      if(!currentStock) currentStock = newStock;
+    const ns = newStockInput.value.trim();
+    if (ns && !stocks.includes(ns)) {
+      stocks.push(ns);
+      if (!currentStock) currentStock = ns;
       newStockInput.value = '';
       saveStocks();
       renderSettingsList();
       renderApp();
-    } else if (stocks.includes(newStock)) {
-        alert('이미 존재하는 종목입니다.');
+    } else if (stocks.includes(ns)) {
+      alert('이미 존재하는 종목입니다.');
     }
   });
 }
 
-// Run app
+// ── Run ──────────────────────────────────────────────────────
 init();

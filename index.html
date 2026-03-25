@@ -33,6 +33,10 @@
         <i class="fa-solid fa-coins logo-icon"></i>
         <h1>Divi<span class="highlight">Tracker</span></h1>
       </div>
+      <div class="account-toggle">
+        <button class="acc-btn active" id="acc1-btn">&#8361; 계좌1</button>
+        <button class="acc-btn" id="acc2-btn">$ 계좌2</button>
+      </div>
       <button id="settings-btn" class="icon-btn" title="포트폴리오 설정">
         <i class="fa-solid fa-gear"></i>
       </button>
@@ -49,7 +53,7 @@
         </h2>
         <div class="total-amount">
           <span id="total-dividend">0</span>
-          <span class="currency">원</span>
+          <span class="currency" id="currency-label">원</span>
         </div>
         
         <!-- Progress Bar Section -->
@@ -61,7 +65,7 @@
           <div class="progress-track">
             <div class="progress-fill" id="goal-fill"></div>
           </div>
-          <div class="progress-target-text">목표 금액: <span id="goal-amount-text">0</span>원</div>
+          <div class="progress-target-text">목표 금액: <span id="goal-amount-text">0</span></div>
         </div>
       </section>
 
@@ -104,7 +108,7 @@
         
         <!-- Goal Setting -->
         <div class="target-goal-form">
-          <label for="goal-input">올해 목표 금액 (원)</label>
+          <label for="goal-input">올해 목표 금액 <span id="goal-label-unit">(원)</span></label>
           <div class="input-wrapper-lg">
             <input type="text" id="goal-input" inputmode="numeric" placeholder="예: 5000000">
             <span>원</span>
